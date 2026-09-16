@@ -1,6 +1,6 @@
 # wify
 
-Personal cognitive OS. **Sprint 1** is a local, reversible mail-draft HITL loop:
+Personal cognitive OS. **Sprint 1** is a local, reversible mail-draft HITL loop; Identity Approve is a sibling HITL screen in the same UI:
 
 **Doer → Critic → Approve**
 
@@ -9,8 +9,10 @@ No calendar, no LoRA, no meta-agents, no irreversible actions, no cloud sync, no
 ## Layout
 
 ```
-apps/approve-ui/          Vite + React + Tailwind Approve card (port 5173)
+apps/approve-ui/          Vite + React + Tailwind Approve UI (port 5173)
+                          / mail HITL · /identity identity HITL
 services/mail-loop/       Local mock API (127.0.0.1:8787)
+identity-loop             Parallel backend on 127.0.0.1:8788 (not in this repo)
 ```
 
 ## How to run locally
@@ -46,9 +48,42 @@ Or from the repo root (after `npm install` in `apps/approve-ui`):
 npm run approve-ui
 ```
 
-Open **http://127.0.0.1:5173**. The card loads `GET /local/approve-card?case=pass-to-card` via the Vite proxy to `127.0.0.1:8787`.
+Open **http://127.0.0.1:5173**. The mail card loads `GET /local/approve-card?case=pass-to-card` via the Vite proxy to `127.0.0.1:8787`.
 
 Optional query: `http://127.0.0.1:5173/?case=reject-ai-tell` (Critic-rejected fixture; Approve is locked).
+
+### 3. Identity Approve — `http://127.0.0.1:5173/identity`
+
+Same Vite app, `/identity` mode. The identity card talks to **identity-loop on `127.0.0.1:8788`** (may land in parallel).
+
+```bash
+cd apps/approve-ui
+npm install
+npm run dev
+```
+
+Then open **http://127.0.0.1:5173/identity**. Default case is `pass-like-me`.
+
+| What | Where |
+| --- | --- |
+| UI | `http://127.0.0.1:5173/identity` |
+| identity-loop | `http://127.0.0.1:8788` |
+| Vite proxy (default) | `/id-api` → `:8788` (so identity `/local/egress-destinations` does not hit mail-loop) |
+| Direct API | `VITE_IDENTITY_LOOP_BASE=http://127.0.0.1:8788` |
+| UI-only smoke | `http://127.0.0.1:5173/identity?mock=1` or `VITE_IDENTITY_MOCK=1` |
+
+Copy `apps/approve-ui/.env.example` if you need to override the base URL. Mock mode does not add egress, send, calendar, or LoRA — it only fixtures the card so the UI can be exercised without identity-loop.
+
+Identity contract:
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/local/identity/card?case=pass-like-me` | `prompt`, `draft`, `critic_score`, `reject_reason`, `fit_tags`, `risk`, `status` |
+| POST | `/local/identity/verdict` | כמוני: `{ case, risk, status: "approved", verdict: "like_me" }` |
+| POST | `/local/identity/verdict` | לא כמוני: `{ case, risk, status: "rejected", verdict: "not_like_me", reject_reason }` (empty reason → 400) |
+| GET | `/local/egress-destinations` | Identity expects `[]` (UI shows אין יעד יוצא) |
+
+`enforceApproveIntent` is the same as mail: missing `risk`/`status` → 400; `irreversible` → 403; `status≠approved` when approving → 403. The UI always sends `risk` from the loaded card plus the intended `status`.
 
 ## Sprint 1 scope
 
@@ -57,6 +92,7 @@ In:
 - Local Doer draft (strips typographic em dashes `—` and ellipsis `…` to ASCII)
 - Critic fail-closed on remaining `ai_tell` / `tone_mismatch` **before** the UI (`ui_shown_at` stays `null`)
 - HITL Approve card (Hebrew copy)
+- Identity HITL at `/identity` (כמוני / לא כמוני) against identity-loop `:8788`
 - Mock SMTP payload **only after** Approve of a reversible, Critic-passed draft
 - QA route `GET /local/qa/critic-before-user` (case-3 is an intentional order bug)
 
@@ -105,4 +141,7 @@ curl -s -X POST http://127.0.0.1:8787/local/approve \
 ```bash
 npm test
 # or: cd services/mail-loop && node --test
+
+cd apps/approve-ui && npm test   # identity verdict helpers
+cd apps/approve-ui && npm run build
 ```
