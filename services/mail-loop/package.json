@@ -1,0 +1,13 @@
+{
+  "name": "@wify/mail-loop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test lib.test.mjs http.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

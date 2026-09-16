@@ -1,0 +1,15 @@
+{
+  "name": "wify",
+  "private": true,
+  "version": "0.1.0",
+  "description": "wify — personal cognitive OS. Sprint 1: local mail draft loop (Doer → Critic → Approve).",
+  "scripts": {
+    "mail-loop": "node services/mail-loop/server.mjs",
+    "approve-ui": "npm run dev --prefix apps/approve-ui",
+    "test": "npm test --prefix services/mail-loop",
+    "build:ui": "npm run build --prefix apps/approve-ui"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
