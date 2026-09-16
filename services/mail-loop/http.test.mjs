@@ -17,6 +17,21 @@ async function withServer(fn) {
   }
 }
 
+test("CORS allowlists the Vite UI origin and does not reflect others", async () => {
+  await withServer(async (base) => {
+    const allowed = await fetch(`${base}/health`, {
+      headers: { Origin: "http://127.0.0.1:5173" },
+    });
+    assert.equal(allowed.headers.get("access-control-allow-origin"), "http://127.0.0.1:5173");
+
+    const other = await fetch(`${base}/health`, {
+      headers: { Origin: "https://evil.example" },
+    });
+    assert.equal(other.headers.get("access-control-allow-origin"), "http://127.0.0.1:5173");
+    assert.notEqual(other.headers.get("access-control-allow-origin"), "https://evil.example");
+  });
+});
+
 test("GET /health is ok", async () => {
   await withServer(async (base) => {
     const res = await fetch(`${base}/health`);
@@ -45,7 +60,7 @@ test("GET approve-card reject-ai-tell is rejected with Hebrew reason", async () 
     const card = await res.json();
     assert.equal(res.status, 200);
     assert.equal(card.status, "rejected");
-    assert.match(card.reject_reason, /AI/);
+    assert.match(card.reject_reason, /סימן AI בטיוטה/);
   });
 });
 

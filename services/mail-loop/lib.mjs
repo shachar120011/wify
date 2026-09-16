@@ -1,10 +1,6 @@
 /** Official rejection tags (Q): tone_mismatch | ai_tell | (+ intentional empty for bug case) */
 export const REJECTION_TAGS = ["tone_mismatch", "ai_tell"];
 
-/** Typographic / LLM tells the Critic must catch before UI */
-export const AI_TELL_RE =
-  /[—–…]|\u2014|\u2013|\bas an AI\b|\bI hope this (email|message) finds you\b|\bdelve\b|\bseamless(ly)?\b/i;
-
 export function findAiTells(text) {
   const hits = [];
   if (!text) return hits;

@@ -1,5 +1,5 @@
 import { Check, ShieldAlert, X } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ApprovePayload, Status } from './types'
 
 type Props = {
@@ -18,18 +18,24 @@ function scoreTone(score: number) {
 export function ApproveCard({ payload, onDecide }: Props) {
   const [status, setStatus] = useState<Status>(payload.status)
   const [busy, setBusy] = useState(false)
-  const locked = status !== 'pending' || busy
+  const [actionError, setActionError] = useState<string | null>(null)
+  const inflight = useRef(false)
+  const locked = status !== 'pending' || busy || inflight.current
 
   if (payload.risk !== 'reversible') return null
 
   async function decide(next: 'approved' | 'rejected') {
-    if (locked) return
+    if (status !== 'pending' || inflight.current) return
+    inflight.current = true
     setBusy(true)
+    setActionError(null)
     try {
       await onDecide?.(next)
       setStatus(next)
-    } catch {
+    } catch (err) {
+      inflight.current = false
       setBusy(false)
+      setActionError(err instanceof Error ? err.message : 'הפעולה נכשלה')
       return
     }
     setBusy(false)
@@ -70,6 +76,11 @@ export function ApproveCard({ payload, onDecide }: Props) {
           {payload.reject_reason ? (
             <p className="mt-2 text-xs text-rose-300">{payload.reject_reason}</p>
           ) : null}
+          {actionError ? (
+            <p className="mt-2 text-xs text-rose-300" dir="ltr">
+              {actionError}
+            </p>
+          ) : null}
         </section>
 
         <section className="rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-3">
@@ -104,20 +115,22 @@ export function ApproveCard({ payload, onDecide }: Props) {
         <button
           type="button"
           disabled={locked}
+          aria-label="דחה"
           onClick={() => void decide('rejected')}
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/12 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <X className="size-4" aria-hidden />
-          Reject
+          דחה
         </button>
         <button
           type="button"
           disabled={locked}
+          aria-label="אשר"
           onClick={() => void decide('approved')}
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Check className="size-4" aria-hidden />
-          Approve
+          אשר
         </button>
       </footer>
 

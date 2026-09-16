@@ -46,7 +46,7 @@ Or from the repo root (after `npm install` in `apps/approve-ui`):
 npm run approve-ui
 ```
 
-Open **http://127.0.0.1:5173**. The card loads `GET http://127.0.0.1:8787/local/approve-card?case=pass-to-card`.
+Open **http://127.0.0.1:5173**. The card loads `GET /local/approve-card?case=pass-to-card` via the Vite proxy to `127.0.0.1:8787`.
 
 Optional query: `http://127.0.0.1:5173/?case=reject-ai-tell` (Critic-rejected fixture; Approve is locked).
 
@@ -54,8 +54,8 @@ Optional query: `http://127.0.0.1:5173/?case=reject-ai-tell` (Critic-rejected fi
 
 In:
 
-- Local Doer draft (strips typographic em dashes `—` and other AI tells)
-- Critic fail-closed on `ai_tell` / `tone_mismatch` **before** the UI (`ui_shown_at` stays `null`)
+- Local Doer draft (strips typographic em dashes `—` and ellipsis `…` to ASCII)
+- Critic fail-closed on remaining `ai_tell` / `tone_mismatch` **before** the UI (`ui_shown_at` stays `null`)
 - HITL Approve card (Hebrew copy)
 - Mock SMTP payload **only after** Approve of a reversible, Critic-passed draft
 - QA route `GET /local/qa/critic-before-user` (case-3 is an intentional order bug)
@@ -70,9 +70,10 @@ Out:
 ## Zero-Trust notes
 
 - Process binds **loopback only** (`127.0.0.1`), not `0.0.0.0`.
+- CORS allowlists `http://127.0.0.1:5173` (and `localhost:5173`). The UI also proxies `/local` through Vite so the browser stays same-origin.
 - The only declared egress destination is **SMTP**, and it is allowed only after `approved + reversible + session Approve`.
 - Sprint 1 **does not send mail**. Approve returns `{ egress: { kind: "smtp", mock: true, delivered: false } }`.
-- Critic rejects `ai_tell` (em dash, “as an AI”, …) before the card is pending. Doer must not emit `—`.
+- Doer strips `—` / `–` / `…`. Critic still rejects leftover `ai_tell` (em dash, “as an AI”, …) before the card is pending.
 - No tokens, no `.env` secrets, no remote model calls.
 
 ## API (local mock)

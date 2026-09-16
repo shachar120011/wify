@@ -1,6 +1,7 @@
 import type { ApprovePayload } from './types'
 
-const BASE = 'http://127.0.0.1:8787'
+/** Empty in `npm run dev` so Vite can proxy /local to 127.0.0.1:8787. */
+const BASE = import.meta.env.VITE_MAIL_LOOP_BASE ?? ''
 
 export async function fetchApproveCard(
   caseId = 'pass-to-card',
@@ -28,7 +29,6 @@ export async function postReject(caseId = 'pass-to-card'): Promise<unknown> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ case: caseId }),
   })
-  // reject endpoint may not exist — soft-fail for Demo
-  if (!res.ok && res.status !== 404) throw new Error(`reject ${res.status}`)
+  if (!res.ok) throw new Error(`reject ${res.status}`)
   return res.json().catch(() => ({}))
 }
