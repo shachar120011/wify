@@ -61,10 +61,10 @@ export function ApproveCard({ payload, onDecide }: Props) {
         <section>
           <h2 className="mb-2 text-xs font-medium text-white/45">טיוטה</h2>
           <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3.5 py-3">
-            <p className="text-sm font-medium text-white">
+            <p className="text-sm font-medium text-white" dir="auto">
               {payload.draft.subject}
             </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/70">
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/70" dir="auto">
               {payload.draft.body}
             </p>
           </div>
@@ -89,11 +89,11 @@ export function ApproveCard({ payload, onDecide }: Props) {
             </div>
             <div className="flex gap-2">
               <dt className="w-12 shrink-0 text-white/40">נושא</dt>
-              <dd className="min-w-0 text-white">{payload.subject}</dd>
+              <dd className="min-w-0 text-white" dir="auto">{payload.subject}</dd>
             </div>
             <div className="flex gap-2">
               <dt className="w-12 shrink-0 text-white/40">גוף</dt>
-              <dd className="min-w-0 whitespace-pre-wrap leading-relaxed text-white/80">
+              <dd className="min-w-0 whitespace-pre-wrap leading-relaxed text-white/80" dir="auto">
                 {payload.body}
               </dd>
             </div>

@@ -12,13 +12,9 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     fetchApproveCard(CASE_ID)
       .then((data) => {
-        if (!cancelled) {
-          setPayload(data)
-          setError(null)
-        }
+        if (!cancelled) setPayload(data)
       })
       .catch((err: Error) => {
         if (!cancelled) setError(err.message || 'load failed')
