@@ -17,7 +17,11 @@ export async function postApprove(caseId = 'pass-to-card'): Promise<unknown> {
   const res = await fetch(`${BASE}/local/approve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ case: caseId }),
+    body: JSON.stringify({
+      case: caseId,
+      risk: 'reversible',
+      status: 'approved',
+    }),
   })
   if (!res.ok) throw new Error(`approve ${res.status}`)
   return res.json().catch(() => ({}))

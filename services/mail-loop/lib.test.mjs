@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   criticReview,
   doerDraft,
+  enforceApproveIntent,
   findAiTells,
   materialize,
   qaCriticBeforeUser,
@@ -89,4 +90,39 @@ test("qa critic-before-user: case-3 fails, others pass", () => {
   assert.equal(byName["pass-to-card"].pass, true);
   assert.equal(byName["reject-before-ui"].pass, true);
   assert.equal(byName["reject-ai-tell"].pass, true);
+});
+
+test("enforceApproveIntent requires risk and status on the request body", () => {
+  assert.equal(enforceApproveIntent({}).code, 400);
+  assert.equal(enforceApproveIntent({ case: "pass-to-card" }).err, "risk and status required");
+});
+
+test("enforceApproveIntent blocks irreversible even if status is approved", () => {
+  const r = enforceApproveIntent({
+    risk: "irreversible",
+    status: "approved",
+    case: "pass-to-card",
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 403);
+  assert.equal(r.err, "irreversible blocked");
+});
+
+test("enforceApproveIntent blocks status other than approved", () => {
+  const r = enforceApproveIntent({
+    risk: "reversible",
+    status: "rejected",
+    case: "pass-to-card",
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 403);
+});
+
+test("enforceApproveIntent allows reversible+approved", () => {
+  const r = enforceApproveIntent({
+    risk: "reversible",
+    status: "approved",
+    case: "pass-to-card",
+  });
+  assert.equal(r.ok, true);
 });

@@ -64,12 +64,60 @@ test("GET approve-card reject-ai-tell is rejected with Hebrew reason", async () 
   });
 });
 
-test("POST approve on pass-to-card returns mock SMTP only", async () => {
+async function postApprove(base, payload) {
+  return fetch(`${base}/local/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+test("POST approve {} is 400 because risk and status are required", async () => {
   await withServer(async (base) => {
-    const res = await fetch(`${base}/local/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ case: "pass-to-card" }),
+    const res = await postApprove(base, {});
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.error, "risk and status required");
+    assert.equal(body.sent, undefined);
+    assert.equal(body.egress, undefined);
+  });
+});
+
+test("POST approve with risk=irreversible is 403 and never sends", async () => {
+  await withServer(async (base) => {
+    const res = await postApprove(base, {
+      risk: "irreversible",
+      status: "approved",
+      case: "pass-to-card",
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.error, "irreversible blocked");
+    assert.equal(body.sent, undefined);
+    assert.equal(body.egress?.allowed, undefined);
+  });
+});
+
+test("POST approve with status=rejected is 403 and never sends", async () => {
+  await withServer(async (base) => {
+    const res = await postApprove(base, {
+      risk: "reversible",
+      status: "rejected",
+      case: "pass-to-card",
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.notEqual(res.status, 200);
+    assert.equal(body.sent, undefined);
+  });
+});
+
+test("POST approve with reversible+approved on pass-to-card returns mock SMTP only", async () => {
+  await withServer(async (base) => {
+    const res = await postApprove(base, {
+      risk: "reversible",
+      status: "approved",
+      case: "pass-to-card",
     });
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -80,12 +128,12 @@ test("POST approve on pass-to-card returns mock SMTP only", async () => {
   });
 });
 
-test("POST approve on critic-rejected card is blocked", async () => {
+test("POST approve on critic-rejected card is blocked even with session approve fields", async () => {
   await withServer(async (base) => {
-    const res = await fetch(`${base}/local/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ case: "reject-ai-tell" }),
+    const res = await postApprove(base, {
+      risk: "reversible",
+      status: "approved",
+      case: "reject-ai-tell",
     });
     assert.equal(res.status, 403);
     const body = await res.json();

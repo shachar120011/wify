@@ -202,6 +202,23 @@ export function enforceRiskStatus(payload) {
   return { ok: true };
 }
 
+/** POST /local/approve: trust the request body, not only the materialized case. */
+export function enforceApproveIntent(body) {
+  if (body == null || typeof body !== "object") {
+    return { ok: false, code: 400, err: "risk and status required" };
+  }
+  if (!body.risk || !body.status) {
+    return { ok: false, code: 400, err: "risk and status required" };
+  }
+  if (body.risk === "irreversible") {
+    return { ok: false, code: 403, err: "irreversible blocked" };
+  }
+  if (body.status !== "approved" || body.risk !== "reversible") {
+    return { ok: false, code: 403, err: "approve requires status=approved and risk=reversible" };
+  }
+  return { ok: true };
+}
+
 export function qaCriticBeforeUser() {
   const names = ["reject-before-ui", "pass-to-card", "bug-bad-order", "reject-ai-tell"];
   const results = names.map((name) => {

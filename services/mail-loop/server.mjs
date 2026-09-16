@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   REJECTION_TAGS,
   egress,
+  enforceApproveIntent,
   enforceRiskStatus,
   findAiTells,
   materialize,
@@ -119,6 +120,8 @@ export function createServer() {
       } catch {
         return json(400, { error: "invalid json" });
       }
+      const intent = enforceApproveIntent(body);
+      if (!intent.ok) return json(intent.code, { error: intent.err });
       const key = body.case || "pass-to-card";
       const item = materialize(key);
       if (!item) return json(404, { error: "unknown case" });
