@@ -45,7 +45,7 @@ export function MailApp() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 pt-16">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 pt-16">
       {loading ? (
         <p className="text-sm text-white/50">טוען מ־localhost:8787…</p>
       ) : null}
@@ -58,6 +58,6 @@ export function MailApp() {
       <p className="text-xs text-white/35" dir="ltr">
         case={caseId}
       </p>
-    </div>
+    </main>
   )
 }

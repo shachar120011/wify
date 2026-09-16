@@ -6,10 +6,13 @@ import {
   identityActionsLocked,
   identityCaseFromSearch,
   identityMockFromSearch,
+  identityPath,
+  identityRejectClick,
   mockIdentityCard,
   MOCK_IDENTITY_CARDS,
   normalizeIdentityCard,
   normalizeRejectReason,
+  resolveIdentityBase,
 } from './identity'
 
 describe('identity case query', () => {
@@ -144,5 +147,39 @@ describe('normalizeIdentityCard', () => {
     })
     expect(card.fit_tags).toEqual([])
     expect(card.reject_reason).toBeNull()
+  })
+})
+
+describe('identityRejectClick', () => {
+  test('first click opens the reason field instead of POSTing', () => {
+    expect(identityRejectClick(false, '')).toBe('open')
+    expect(identityRejectClick(false, 'לא בסגנון')).toBe('open')
+  })
+
+  test('second click with empty reason stays on the field', () => {
+    expect(identityRejectClick(true, '   ')).toBe('need-reason')
+  })
+
+  test('second click with a reason is ready to POST', () => {
+    expect(identityRejectClick(true, 'לא בסגנון')).toBe('submit')
+  })
+})
+
+describe('identity API base (must not hit mail-loop egress)', () => {
+  test('empty or missing env uses the /id-api Vite proxy to :8788', () => {
+    expect(resolveIdentityBase(undefined)).toBe('/id-api')
+    expect(resolveIdentityBase('')).toBe('/id-api')
+    expect(
+      identityPath(resolveIdentityBase(''), '/local/egress-destinations'),
+    ).toBe('/id-api/local/egress-destinations')
+  })
+
+  test('explicit loop URL is used as-is', () => {
+    expect(
+      identityPath(
+        resolveIdentityBase('http://127.0.0.1:8788'),
+        '/local/identity/card',
+      ),
+    ).toBe('http://127.0.0.1:8788/local/identity/card')
   })
 })

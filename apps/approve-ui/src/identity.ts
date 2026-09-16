@@ -132,3 +132,22 @@ export const FIT_TAG_LABELS: Record<string, string> = {
 export function fitTagLabel(tag: string): string {
   return FIT_TAG_LABELS[tag] ?? tag
 }
+
+export function resolveIdentityBase(envBase: string | undefined): string {
+  return envBase || '/id-api'
+}
+
+export function identityPath(base: string, path: string): string {
+  return `${base.replace(/\/$/, '')}${path}`
+}
+
+export type IdentityRejectClick = 'open' | 'need-reason' | 'submit'
+
+export function identityRejectClick(
+  rejectOpen: boolean,
+  reason: string,
+): IdentityRejectClick {
+  if (!rejectOpen) return 'open'
+  if (!normalizeRejectReason(reason)) return 'need-reason'
+  return 'submit'
+}

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   fitTagLabel,
   identityActionsLocked,
+  identityRejectClick,
   type IdentityCard as IdentityCardPayload,
 } from './identity'
 
@@ -44,7 +45,7 @@ export function IdentityCard({
   }, [showRejectField])
 
   async function likeMe() {
-    if (locked) return
+    if (status !== 'pending' || criticLocked || inflight.current) return
     inflight.current = true
     setBusy(true)
     setActionError(null)
@@ -62,8 +63,9 @@ export function IdentityCard({
   }
 
   async function notLikeMe() {
-    if (locked) return
-    if (!reasonReady) {
+    if (status !== 'pending' || criticLocked || inflight.current) return
+    const next = identityRejectClick(true, rejectReason)
+    if (next !== 'submit') {
       setRejectOpen(true)
       setReasonHint(true)
       return
@@ -193,10 +195,16 @@ export function IdentityCard({
           aria-label="לא כמוני"
           aria-expanded={showRejectField}
           onClick={() => {
-            if (locked) return
-            if (!rejectOpen) {
+            if (status !== 'pending' || criticLocked || inflight.current) return
+            const next = identityRejectClick(rejectOpen, rejectReason)
+            if (next === 'open') {
               setRejectOpen(true)
               setActionError(null)
+              return
+            }
+            if (next === 'need-reason') {
+              setRejectOpen(true)
+              setReasonHint(true)
               return
             }
             void notLikeMe()

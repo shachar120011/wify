@@ -65,7 +65,7 @@ export function IdentityApp() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 pt-16">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 pt-16">
       {loading ? (
         <p className="text-sm text-white/50">טוען מ־localhost:8788…</p>
       ) : null}
@@ -88,6 +88,6 @@ export function IdentityApp() {
       {mock ? (
         <p className="text-xs text-white/30">מצב mock · בלי identity-loop</p>
       ) : null}
-    </div>
+    </main>
   )
 }
