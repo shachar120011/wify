@@ -55,3 +55,23 @@ test('Approve calls onDecide with approved', async () => {
   await user.click(screen.getByRole('button', { name: 'Approve' }))
   expect(onDecide).toHaveBeenCalledWith('approved')
 })
+
+test('Reject calls onDecide with rejected', async () => {
+  const onDecide = vi.fn()
+  const user = userEvent.setup()
+  render(<ApproveCard payload={base} onDecide={onDecide} />)
+  await user.click(screen.getByRole('button', { name: 'Reject' }))
+  expect(onDecide).toHaveBeenCalledWith('rejected')
+})
+
+test('failed Approve keeps the card pending and shows an error', async () => {
+  const onDecide = vi.fn().mockRejectedValue(new Error('approve 500'))
+  const user = userEvent.setup()
+  render(<ApproveCard payload={base} onDecide={onDecide} />)
+  await user.click(screen.getByRole('button', { name: 'Approve' }))
+  expect(screen.getByText('השליחה נכשלה')).toBeTruthy()
+  expect(
+    (screen.getByRole('button', { name: 'Approve' }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(false)
+})

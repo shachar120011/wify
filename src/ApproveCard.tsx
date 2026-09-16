@@ -18,6 +18,7 @@ function scoreTone(score: number) {
 export function ApproveCard({ payload, onDecide }: Props) {
   const [status, setStatus] = useState<Status>(payload.status)
   const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const locked = status !== 'pending' || busy
 
   // Hide irreversible cases; ignore risk otherwise (never render it).
@@ -26,10 +27,12 @@ export function ApproveCard({ payload, onDecide }: Props) {
   async function decide(next: 'approved' | 'rejected') {
     if (locked) return
     setBusy(true)
+    setActionError(null)
     try {
       await onDecide?.(next)
       setStatus(next)
     } catch {
+      setActionError('השליחה נכשלה')
       setBusy(false)
       return
     }
@@ -122,6 +125,11 @@ export function ApproveCard({ payload, onDecide }: Props) {
         </button>
       </footer>
 
+      {actionError ? (
+        <p className="border-t border-white/10 px-5 py-3 text-center text-xs text-rose-300">
+          {actionError}
+        </p>
+      ) : null}
       {status !== 'pending' ? (
         <p className="border-t border-white/10 px-5 py-3 text-center text-xs text-white/50">
           {status === 'approved'
