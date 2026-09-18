@@ -45,7 +45,8 @@ function parseJson(raw) {
 }
 
 function dataDirFromEnv() {
-  return process.env.WHATSAPP_DATA_DIR || path.join(process.cwd(), "data", "whatsapp");
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  return process.env.WHATSAPP_DATA_DIR || path.join(here, "..", "..", "data", "whatsapp");
 }
 
 function isMock() {
@@ -106,9 +107,10 @@ export function createServer(opts = {}) {
           error: null,
           mock: true,
           send: false,
+          ...store.stats(),
         });
       }
-      return json(200, live.getStatus());
+      return json(200, { ...live.getStatus(), ...store.stats() });
     }
 
     if (url.pathname === "/local/whatsapp/chats") {
@@ -156,6 +158,22 @@ export function createServer(opts = {}) {
     }
 
     if (url.pathname === "/local/whatsapp/export" && req.method === "POST") {
+      if (!mock) {
+        const st = live.getStatus();
+        if (st.state !== "connected") {
+          return json(409, { error: "not connected", state: st.state });
+        }
+        if (store.stats().chats === 0) {
+          await live.waitForSync(20_000);
+        }
+        if (store.stats().chats === 0) {
+          return json(409, {
+            error: "no chats synced yet",
+            state: st.state,
+            hint: "wait for WhatsApp history, then export again",
+          });
+        }
+      }
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
       const outDir = path.join(dataDir, "export", stamp);
       await mkdir(outDir, { recursive: true });

@@ -27,7 +27,11 @@ export function WhatsAppApp() {
 
   useEffect(() => {
     document.title = 'wify · וואטסאפ'
-  }, [])
+    if (mock) return
+    void postWhatsappConnect({ mock: false }).catch((err: Error) => {
+      setError(err.message || 'connect failed')
+    })
+  }, [mock])
 
   async function refresh() {
     const next = await fetchWhatsappStatus({ mock })
@@ -197,7 +201,13 @@ export function WhatsAppApp() {
             </section>
           ) : null}
 
-          {connected ? (
+          {connected && chats.length === 0 ? (
+            <p className="text-sm text-amber-200">
+              מחובר. ממתין לסנכרון שיחות מהטלפון…
+            </p>
+          ) : null}
+
+          {connected && chats.length > 0 ? (
             <section>
               <h2 className="mb-2 text-xs font-medium text-white/45">
                 שיחות ({chats.length})
@@ -209,7 +219,7 @@ export function WhatsAppApp() {
                     className="rounded-lg px-2.5 py-2 text-sm text-white/80"
                   >
                     <span className="font-medium text-white">{chat.name}</span>
-                    <span className="mt-0.5 block text-[11px] text-white/35" dir="ltr">
+                    <span className="mt-1 block text-[11px] text-white/35" dir="ltr">
                       {chat.isGroup ? 'group' : 'chat'} · {chat.jid}
                     </span>
                   </li>
@@ -242,7 +252,7 @@ export function WhatsAppApp() {
           ) : (
             <button
               type="button"
-              disabled={exporting}
+              disabled={exporting || chats.length === 0}
               aria-label="ייצא התכתבויות"
               onClick={() => void onExport()}
               className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-40"

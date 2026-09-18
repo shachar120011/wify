@@ -13,6 +13,8 @@ export type WhatsappStatus = {
   error: string | null
   mock: boolean
   send: boolean
+  chats?: number
+  messages?: number
 }
 
 export type WhatsappChat = {

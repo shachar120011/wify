@@ -7,6 +7,8 @@ import {
   chatDisplayName,
   extractMessageBody,
   MOCK_CHATS,
+  asArray,
+  canReuseWhatsappSession,
   MOCK_MESSAGES,
   normalizeMessage,
   renderChatMarkdown,
@@ -110,6 +112,19 @@ test("renderChatMarkdown groups by day and labels me vs peer", () => {
   assert.match(md, /## 2026-09-18/);
   assert.match(md, /\*\*09:01\*\* דני: היי/);
   assert.match(md, /\*\*09:02\*\* אני: \[תמונה\] צילום מסך/);
+});
+
+test("asArray wraps objects and ignores null", () => {
+  assert.deepEqual(asArray(null), []);
+  assert.deepEqual(asArray([{ id: 1 }]), [{ id: 1 }]);
+  assert.deepEqual(asArray({ id: 1 }), [{ id: 1 }]);
+});
+
+test("canReuseWhatsappSession keeps an in-flight QR socket", () => {
+  assert.equal(canReuseWhatsappSession("qr", true), true);
+  assert.equal(canReuseWhatsappSession("connected", true), true);
+  assert.equal(canReuseWhatsappSession("disconnected", true), false);
+  assert.equal(canReuseWhatsappSession("qr", false), false);
 });
 
 test("writeExport writes manifest json and per-chat markdown without sending", async () => {

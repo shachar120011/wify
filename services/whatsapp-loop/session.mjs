@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { chatDisplayName, normalizeMessage } from "./lib.mjs";
+import { asArray, canReuseWhatsappSession, chatDisplayName, normalizeMessage } from "./lib.mjs";
 
 function tsToIso(value) {
   const n = Number(value || 0);
@@ -26,6 +26,7 @@ export function createLiveSession({ dataDir, store, onChange }) {
   let starting = null;
   let reconnectTimer = null;
   let generation = 0;
+  let loadedStore = false;
   const snapshot = {
     state: "disconnected",
     qr: null,
@@ -60,11 +61,11 @@ export function createLiveSession({ dataDir, store, onChange }) {
     }
   }
 
-  function ingestHistory({ chats = [], contacts = [], messages = [] }) {
-    for (const contact of contacts) store.upsertContact(contact);
+  function ingestHistory({ chats = [], contacts = [], messages = [] } = {}) {
+    for (const contact of asArray(contacts)) store.upsertContact(contact);
     const contactMap = store.contactsObject();
-    for (const chat of chats) store.upsertChat(fromBaileysChat(chat, contactMap));
-    for (const msg of messages) {
+    for (const chat of asArray(chats)) store.upsertChat(fromBaileysChat(chat, contactMap));
+    for (const msg of asArray(messages)) {
       const row = normalizeMessage(msg);
       if (row.pushName && row.sender) {
         store.upsertContact({ id: row.sender, notify: row.pushName, name: row.pushName });
@@ -93,6 +94,9 @@ export function createLiveSession({ dataDir, store, onChange }) {
 
   async function start() {
     if (starting) return starting;
+    if (canReuseWhatsappSession(snapshot.state, Boolean(sock))) {
+      return getStatus();
+    }
     starting = connect().finally(() => {
       starting = null;
     });
@@ -107,7 +111,10 @@ export function createLiveSession({ dataDir, store, onChange }) {
     }
     endSock();
     await mkdir(authDir, { recursive: true });
-    await store.load(storeDir);
+    if (!loadedStore) {
+      await store.load(storeDir);
+      loadedStore = true;
+    }
     const baileys = await import("@whiskeysockets/baileys");
     const makeWASocket =
       baileys.default?.default || baileys.default || baileys.makeWASocket;
@@ -131,6 +138,7 @@ export function createLiveSession({ dataDir, store, onChange }) {
       auth: state,
       browser: Browsers.ubuntu("Chrome"),
       syncFullHistory: true,
+      shouldSyncHistoryMessage: () => true,
       markOnlineOnConnect: false,
       logger,
     });
@@ -180,6 +188,7 @@ export function createLiveSession({ dataDir, store, onChange }) {
         snapshot.me = { id: me.id, name: me.name || me.verifiedName || "me" };
         emit();
         void persist();
+        void seedGroups();
       }
       if (connection === "close") {
         const err = lastDisconnect?.error;
@@ -207,6 +216,31 @@ export function createLiveSession({ dataDir, store, onChange }) {
     });
 
     return getStatus();
+  }
+
+  async function seedGroups() {
+    try {
+      const groups = await sock?.groupFetchAllParticipating?.();
+      if (!groups) return;
+      ingestHistory({ chats: Object.values(groups) });
+    } catch {
+      // groups are optional; 1:1 history still arrives via messaging-history.set
+    }
+  }
+
+  function waitForSync(ms = 20_000) {
+    const started = Date.now();
+    return new Promise((resolve) => {
+      const tick = () => {
+        const stats = store.stats();
+        if (stats.chats > 0 || Date.now() - started >= ms) {
+          resolve(stats);
+          return;
+        }
+        setTimeout(tick, 250);
+      };
+      tick();
+    });
   }
 
   async function requestPairingCode(phone) {
@@ -244,6 +278,7 @@ export function createLiveSession({ dataDir, store, onChange }) {
     start,
     logout,
     requestPairingCode,
+    waitForSync,
     getStatus,
   };
 }

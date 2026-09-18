@@ -171,6 +171,15 @@ export function isExportableJid(jid) {
   return true;
 }
 
+export function asArray(value) {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+export function canReuseWhatsappSession(state, hasSock) {
+  return Boolean(hasSock) && ["qr", "connecting", "connected"].includes(state);
+}
+
 function mediaPrefix(type) {
   const label = MEDIA_LABEL[type];
   return label ? `[${label}]` : "";

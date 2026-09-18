@@ -112,6 +112,26 @@ test("GET /local/egress-destinations is empty - ingest only", async () => {
   });
 });
 
+test("POST export without a live connection is 409", async () => {
+  const dataDir = await mkdtemp(path.join(os.tmpdir(), "wify-wa-live-"));
+  const server = createServer({ mock: false, dataDir });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const addr = server.address();
+  const base = `http://127.0.0.1:${addr.port}`;
+  try {
+    const res = await fetch(`${base}/local/whatsapp/export`, { method: "POST" });
+    assert.equal(res.status, 409);
+    const body = await res.json();
+    assert.equal(body.error, "not connected");
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 test("POST /local/whatsapp/send is 403", async () => {
   await withServer(async (base) => {
     const res = await fetch(`${base}/local/whatsapp/send`, {
