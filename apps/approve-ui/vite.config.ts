@@ -15,6 +15,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8788',
         rewrite: (path) => path.replace(/^\/id-api/, ''),
       },
+      '/wa-api': {
+        target: 'http://127.0.0.1:8789',
+        rewrite: (path) => path.replace(/^\/wa-api/, ''),
+      },
       '/local': 'http://127.0.0.1:8787',
       '/health': 'http://127.0.0.1:8787',
     },

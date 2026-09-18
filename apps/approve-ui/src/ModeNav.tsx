@@ -1,7 +1,9 @@
-type Mode = 'mail' | 'identity'
+type Mode = 'mail' | 'identity' | 'whatsapp'
 
 function modeFromPath(pathname: string): Mode {
-  return pathname.startsWith('/identity') ? 'identity' : 'mail'
+  if (pathname.startsWith('/whatsapp')) return 'whatsapp'
+  if (pathname.startsWith('/identity')) return 'identity'
+  return 'mail'
 }
 
 export function ModeNav({ mode }: { mode: Mode }) {
@@ -28,6 +30,7 @@ export function ModeNav({ mode }: { mode: Mode }) {
       <div className="inline-flex gap-1 rounded-full border border-white/10 bg-[#121214]/90 p-1 backdrop-blur">
         {item('/', mode === 'mail', 'מייל')}
         {item('/identity', mode === 'identity', 'זהות')}
+        {item('/whatsapp', mode === 'whatsapp', 'וואטסאפ')}
       </div>
     </nav>
   )
