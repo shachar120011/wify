@@ -24,6 +24,8 @@ export function createLiveSession({ dataDir, store, onChange }) {
   const storeDir = path.join(dataDir, "store");
   let sock = null;
   let starting = null;
+  let reconnectTimer = null;
+  let generation = 0;
   const snapshot = {
     state: "disconnected",
     qr: null,
@@ -73,6 +75,22 @@ export function createLiveSession({ dataDir, store, onChange }) {
     emit();
   }
 
+  function endSock() {
+    const current = sock;
+    sock = null;
+    if (!current) return;
+    try {
+      current.ev.removeAllListeners();
+    } catch {
+      // ignore
+    }
+    try {
+      current.end(undefined);
+    } catch {
+      // ignore
+    }
+  }
+
   async function start() {
     if (starting) return starting;
     starting = connect().finally(() => {
@@ -82,22 +100,20 @@ export function createLiveSession({ dataDir, store, onChange }) {
   }
 
   async function connect() {
+    const myGen = ++generation;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    endSock();
     await mkdir(authDir, { recursive: true });
     await store.load(storeDir);
     const baileys = await import("@whiskeysockets/baileys");
     const makeWASocket =
       baileys.default?.default || baileys.default || baileys.makeWASocket;
-    const { useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } =
-      baileys;
+    const { useMultiFileAuthState, DisconnectReason, Browsers } = baileys;
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
-    let version;
-    try {
-      const latest = await fetchLatestBaileysVersion();
-      version = latest.version;
-    } catch {
-      version = undefined;
-    }
-    snapshot.state = "connecting";
+    snapshot.state = snapshot.qr ? "qr" : "connecting";
     snapshot.error = null;
     emit();
 
@@ -109,13 +125,24 @@ export function createLiveSession({ dataDir, store, onChange }) {
       logger = undefined;
     }
 
-    sock = makeWASocket({
-      version,
+    // Do not pin fetchLatestBaileysVersion: some latest web builds close with 428
+    // before a QR is emitted. Baileys' bundled default version is enough.
+    const next = makeWASocket({
       auth: state,
-      browser: Browsers.macOS("Desktop"),
+      browser: Browsers.ubuntu("Chrome"),
       syncFullHistory: true,
+      markOnlineOnConnect: false,
       logger,
     });
+    if (myGen !== generation) {
+      try {
+        next.end(undefined);
+      } catch {
+        // superseded
+      }
+      return getStatus();
+    }
+    sock = next;
 
     sock.ev.on("creds.update", saveCreds);
     sock.ev.on("messaging-history.set", (payload) => ingestHistory(payload || {}));
@@ -126,6 +153,7 @@ export function createLiveSession({ dataDir, store, onChange }) {
     sock.ev.on("messages.upsert", ({ messages }) => ingestHistory({ messages }));
 
     sock.ev.on("connection.update", async (update) => {
+      if (myGen !== generation) return;
       const { connection, lastDisconnect, qr } = update;
       if (qr) {
         try {
@@ -136,10 +164,11 @@ export function createLiveSession({ dataDir, store, onChange }) {
         }
         snapshot.state = "qr";
         snapshot.pairingCode = null;
+        snapshot.error = null;
         emit();
       }
-      if (connection === "connecting") {
-        snapshot.state = snapshot.qr ? "qr" : "connecting";
+      if (connection === "connecting" && snapshot.state !== "qr") {
+        snapshot.state = "connecting";
         emit();
       }
       if (connection === "open") {
@@ -147,7 +176,7 @@ export function createLiveSession({ dataDir, store, onChange }) {
         snapshot.qr = null;
         snapshot.pairingCode = null;
         snapshot.error = null;
-        const me = sock.user || {};
+        const me = sock?.user || {};
         snapshot.me = { id: me.id, name: me.name || me.verifiedName || "me" };
         emit();
         void persist();
@@ -156,24 +185,24 @@ export function createLiveSession({ dataDir, store, onChange }) {
         const err = lastDisconnect?.error;
         const statusCode = err?.output?.statusCode;
         snapshot.lastDisconnect = statusCode || err?.message || "closed";
-        snapshot.qr = null;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
         if (loggedOut) {
+          snapshot.qr = null;
           snapshot.state = "logged_out";
           snapshot.me = null;
           emit();
           return;
         }
-        snapshot.state = "connecting";
+        if (snapshot.state !== "qr") snapshot.state = "connecting";
         snapshot.error = String(err?.message || "reconnect");
         emit();
-        setTimeout(() => {
+        reconnectTimer = setTimeout(() => {
           void connect().catch((reconnectErr) => {
             snapshot.state = "error";
             snapshot.error = String(reconnectErr?.message || reconnectErr);
             emit();
           });
-        }, 2000);
+        }, 2500);
       }
     });
 
@@ -193,12 +222,17 @@ export function createLiveSession({ dataDir, store, onChange }) {
   }
 
   async function logout() {
+    generation += 1;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     try {
       if (sock?.logout) await sock.logout();
     } catch {
       // ignore
     }
-    sock = null;
+    endSock();
     snapshot.state = "logged_out";
     snapshot.qr = null;
     snapshot.pairingCode = null;
