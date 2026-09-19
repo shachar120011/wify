@@ -5,13 +5,22 @@ import {
   identityActionsLocked,
   identityRejectClick,
   type IdentityCard as IdentityCardPayload,
+  type IdentityVerdictResult,
 } from './identity'
 
 type Props = {
   payload: IdentityCardPayload
   egressEmpty: boolean
-  onLikeMe: () => void | Promise<void>
-  onNotLikeMe: (rejectReason: string) => void | Promise<void>
+  progress?: string | null
+  onLikeMe: () => void | Promise<void | IdentityVerdictResult>
+  onNotLikeMe: (
+    rejectReason: string,
+  ) => void | Promise<void | IdentityVerdictResult>
+}
+
+function verdictAdvances(result: void | IdentityVerdictResult): boolean {
+  if (!result) return false
+  return Boolean(result.nextCard) || result.liveFit?.done === true
 }
 
 function scoreTone(score: number) {
@@ -23,6 +32,7 @@ function scoreTone(score: number) {
 export function IdentityCard({
   payload,
   egressEmpty,
+  progress,
   onLikeMe,
   onNotLikeMe,
 }: Props) {
@@ -51,7 +61,12 @@ export function IdentityCard({
     setActionError(null)
     setRejectOpen(false)
     try {
-      await onLikeMe()
+      const result = await onLikeMe()
+      if (verdictAdvances(result)) {
+        inflight.current = false
+        setBusy(false)
+        return
+      }
       setStatus('approved')
     } catch (err) {
       inflight.current = false
@@ -75,7 +90,13 @@ export function IdentityCard({
     setActionError(null)
     setReasonHint(false)
     try {
-      await onNotLikeMe(rejectReason)
+      const result = await onNotLikeMe(rejectReason)
+      if (verdictAdvances(result)) {
+        inflight.current = false
+        setBusy(false)
+        setRejectOpen(false)
+        return
+      }
       setStatus('rejected')
     } catch (err) {
       inflight.current = false
@@ -96,6 +117,7 @@ export function IdentityCard({
         <div>
           <p className="text-xs font-medium tracking-wide text-white/45">
             זהות · HITL · live
+            {progress ? ` · ${progress}` : ''}
           </p>
           <h1 className="mt-0.5 text-base font-semibold text-white">
             האם זה כמוני?
