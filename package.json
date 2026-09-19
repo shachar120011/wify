@@ -5,8 +5,10 @@
   "description": "wify - personal cognitive OS. Sprint 1: local mail draft loop (Doer -> Critic -> Approve).",
   "scripts": {
     "mail-loop": "node services/mail-loop/server.mjs",
+    "whatsapp-loop": "node services/whatsapp-loop/server.mjs",
+    "whatsapp-loop:mock": "WHATSAPP_MOCK=1 node services/whatsapp-loop/server.mjs",
     "approve-ui": "npm run dev --prefix apps/approve-ui",
-    "test": "npm test --prefix services/mail-loop",
+    "test": "npm test --prefix services/mail-loop && npm test --prefix services/whatsapp-loop",
     "test:ui": "npm test --prefix apps/approve-ui",
     "build:ui": "npm run build --prefix apps/approve-ui"
   },

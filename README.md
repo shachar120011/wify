@@ -4,14 +4,17 @@ Personal cognitive OS. **Sprint 1** is a local, reversible mail-draft HITL loop;
 
 **Doer → Critic → Approve**
 
-No calendar, no LoRA, no meta-agents, no irreversible actions, no cloud sync, no real OAuth, no secrets.
+WhatsApp ingest is a separate local slice: link the phone as a companion device and export chats to disk. No send.
+
+No calendar, no LoRA, no meta-agents, no irreversible actions, no cloud sync, no real OAuth.
 
 ## Layout
 
 ```
 apps/approve-ui/          Vite + React + Tailwind Approve UI (port 5173)
-                          / mail HITL · /identity identity HITL
+                          / mail HITL · /identity identity HITL · /whatsapp ingest
 services/mail-loop/       Local mock API (127.0.0.1:8787)
+services/whatsapp-loop/   Local WhatsApp Web companion + export (127.0.0.1:8789)
 identity-loop             Parallel backend on 127.0.0.1:8788 (not in this repo)
 ```
 
@@ -90,6 +93,48 @@ Identity contract:
 
 `enforceApproveIntent` is the same as mail: missing `risk`/`status` → 400; `irreversible` → 403; `status≠approved` when approving → 403. The UI always sends `risk` from the loaded card plus the intended `status`.
 
+### 4. WhatsApp export — `http://127.0.0.1:5173/whatsapp`
+
+Local companion device (Baileys). Loopback only. **Read/export, never send.** Session files stay in `data/whatsapp/auth/` (gitignored).
+
+```bash
+cd services/whatsapp-loop
+npm install
+node server.mjs
+```
+
+Or from the repo root (after `npm install` in `services/whatsapp-loop`):
+
+```bash
+npm run whatsapp-loop
+```
+
+Then in the UI: **וואטסאפ** → scan the QR from WhatsApp → Linked devices → **ייצא התכתבויות**.
+
+| What | Where |
+| --- | --- |
+| UI | `http://127.0.0.1:5173/whatsapp` |
+| whatsapp-loop | `127.0.0.1:8789` |
+| Vite proxy | `/wa-api` → `:8789` |
+| Direct API | `VITE_WHATSAPP_LOOP_BASE=http://127.0.0.1:8789` |
+| UI-only smoke | `http://127.0.0.1:5173/whatsapp?mock=1` or `WHATSAPP_MOCK=1 npm run whatsapp-loop:mock` |
+| Export files | `data/whatsapp/export/<timestamp>/` (JSON + Markdown, gitignored) |
+
+WhatsApp contract:
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/local/whatsapp/status` | `state`: connecting / qr / connected. `qr` is a data URL while waiting |
+| GET | `/local/whatsapp/chats` | Synced conversations after link |
+| GET | `/local/whatsapp/messages?jid=` | Messages for one chat |
+| POST | `/local/whatsapp/connect` | Start / resume the companion session |
+| POST | `/local/whatsapp/pairing-code` | `{ phone }` → 8-digit linked-device code |
+| POST | `/local/whatsapp/export` | Write JSON+Markdown under `data/whatsapp/export`. `sent: false` |
+| POST | `/local/whatsapp/send` | Always **403** |
+| GET | `/local/egress-destinations` | `[]` |
+
+History arrives from WhatsApp after the first link (`messaging-history.set`). Older threads may be incomplete, same limit as WhatsApp Web.
+
 ## Sprint 1 scope
 
 In:
@@ -100,13 +145,15 @@ In:
 - Identity HITL at `/identity` (כמוני / לא כמוני) against identity-loop `:8788`
 - Mock SMTP payload **only after** Approve of a reversible, Critic-passed draft
 - QA route `GET /local/qa/critic-before-user` (case-3 is an intentional order bug)
+- WhatsApp local companion on `:8789` + JSON/Markdown export (no send)
 
 Out:
 
 - Real mail send / real SMTP
 - Calendar, LoRA, meta-agents
 - Irreversible actions (`risk: irreversible` is 403)
-- Cloud sync, OAuth, secrets
+- Cloud sync, OAuth
+- WhatsApp send (`POST /local/whatsapp/send` is 403)
 
 ## Zero-Trust notes
 
@@ -117,6 +164,7 @@ Out:
 - Sprint 1 **does not send mail**. Approve returns `{ egress: { kind: "smtp", mock: true, delivered: false } }`.
 - Doer strips `—` / `–` / `…`. Critic still rejects leftover `ai_tell` (em dash, “as an AI”, …) before the card is pending.
 - No tokens, no `.env` secrets, no remote model calls.
+- WhatsApp session (`data/whatsapp/auth/`) and exported chats stay on disk and are gitignored. The loop never sends messages.
 
 ## API (local mock)
 
@@ -145,8 +193,9 @@ curl -s -X POST http://127.0.0.1:8787/local/approve \
 
 ```bash
 npm test
-# or: cd services/mail-loop && node --test
+# mail-loop + whatsapp-loop
+# or: cd services/whatsapp-loop && node --test
 
-cd apps/approve-ui && npm test   # identity verdict helpers
+cd apps/approve-ui && npm test   # identity + whatsapp helpers
 cd apps/approve-ui && npm run build
 ```

@@ -11,4 +11,9 @@ describe('modeFromPath', () => {
     expect(modeFromPath('/identity')).toBe('identity')
     expect(modeFromPath('/identity/')).toBe('identity')
   })
+
+  test('whatsapp lives at /whatsapp', () => {
+    expect(modeFromPath('/whatsapp')).toBe('whatsapp')
+    expect(modeFromPath('/whatsapp/')).toBe('whatsapp')
+  })
 })

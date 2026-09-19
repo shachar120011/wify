@@ -1,0 +1,17 @@
+{
+  "name": "@wify/whatsapp-loop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test lib.test.mjs http.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.21",
+    "qrcode": "^1.5.4"
+  }
+}
