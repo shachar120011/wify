@@ -207,13 +207,12 @@ export function parseIdentityCardPayload(raw: unknown): {
     source as Partial<IdentityCard> &
       Pick<IdentityCard, 'prompt' | 'draft' | 'risk' | 'status'>,
   )
-  const caseId =
+  const explicitCase =
     asString(record.case) ||
     asString(source.case) ||
-    asString(record.case_id) ||
-    card.id
-  if (!card.case && caseId) card.case = caseId
-  return { card, caseId }
+    asString(record.case_id)
+  if (!card.case && explicitCase) card.case = explicitCase
+  return { card, caseId: explicitCase || card.id }
 }
 
 export function parseLiveFit(raw: unknown): LiveFitInfo | undefined {
@@ -257,9 +256,11 @@ export function parseIdentityVerdictResponse(
   const nextRaw = record.next_card ?? record.nextCard
   if (nextRaw && typeof nextRaw === 'object') {
     const parsed = parseIdentityCardPayload(nextRaw)
+    const envelopeCase = asString(record.case) || asString(record.case_id)
+    if (envelopeCase && !parsed.card.case) parsed.card.case = envelopeCase
     return {
       nextCard: parsed.card,
-      caseId: parsed.caseId,
+      caseId: envelopeCase || parsed.card.case,
       liveFit: parseLiveFit(raw),
     }
   }
@@ -319,8 +320,7 @@ export function liveFitProgressLabel(
 }
 
 export function liveFitDoneLabel(liveFit?: LiveFitInfo | null): string {
-  const count = liveFit?.count ?? liveFit?.total ?? liveFit?.round
-  if (count != null) return `סיבוב הושלם · ${count}`
+  if (liveFit?.count != null) return `סיבוב הושלם · ${liveFit.count}`
   return 'סיבוב הושלם'
 }
 

@@ -243,6 +243,30 @@ describe('Live Fit start → verdict → next_card', () => {
     expect(verdictCaseId(started.card, started.caseId)).toBe('live-fit-2')
   })
 
+  test('verdict wrapper case is used when next_card has no case field', () => {
+    const result = parseIdentityVerdictResponse({
+      case: 'live-fit-2',
+      next_card: {
+        id: 'c2',
+        prompt: 'משימה 2',
+        draft: 'טיוטה 2',
+        critic_score: 0.8,
+        reject_reason: null,
+        fit_tags: [],
+        risk: 'reversible',
+        status: 'pending',
+      },
+      live_fit: { round: 2, total: 8, done: false },
+    })
+    expect(result.caseId).toBe('live-fit-2')
+    const next = applyIdentityVerdict(
+      { caseId: 'live-fit-1', card: pendingCard },
+      result,
+    )
+    expect(next.caseId).toBe('live-fit-2')
+    expect(verdictCaseId(next.card!, next.caseId)).toBe('live-fit-2')
+  })
+
   test('verdict with next_card advances to that card', () => {
     const started = parseLiveFitStart({
       case: 'live-fit-1',
@@ -308,6 +332,14 @@ describe('Live Fit start → verdict → next_card', () => {
     })
     expect(result.nextCard).toBeTruthy()
     expect(identityActionsLocked(result.nextCard!)).toBe(true)
+  })
+
+  test('done label includes count only when count is present', () => {
+    expect(liveFitDoneLabel({ done: true })).toBe('סיבוב הושלם')
+    expect(liveFitDoneLabel({ done: true, round: 8, total: 8 })).toBe(
+      'סיבוב הושלם',
+    )
+    expect(liveFitDoneLabel({ done: true, count: 8 })).toBe('סיבוב הושלם · 8')
   })
 
   test('progress label is omitted when round is not in the payload', () => {

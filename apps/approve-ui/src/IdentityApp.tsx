@@ -34,6 +34,7 @@ export function IdentityApp() {
   const [payload, setPayload] = useState<IdentityCardPayload | null>(null)
   const [liveFit, setLiveFit] = useState<LiveFitInfo | undefined>()
   const [sessionDone, setSessionDone] = useState(false)
+  const [cardEpoch, setCardEpoch] = useState(0)
   const [egressEmpty, setEgressEmpty] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -47,39 +48,33 @@ export function IdentityApp() {
     setLoading(true)
     setSessionDone(false)
     const cardPromise = liveFitMode
-      ? startLiveFit({ mock }).then((started) => {
+      ? startLiveFit({ mock }).then(async (started) => {
           if (cancelled) return
           setCaseId(started.caseId)
-          setLiveFit(started.liveFit)
+          let info = started.liveFit
+          if (info?.round == null) {
+            const status = await fetchLiveFitStatus({ mock }).catch(() => null)
+            if (status?.round != null) {
+              info = {
+                done: info?.done ?? false,
+                ...info,
+                round: status.round,
+                total: info?.total ?? status.total,
+                count: info?.count ?? status.count,
+              }
+            }
+          }
+          setLiveFit(info)
           return started.card
         })
       : fetchIdentityCard(queryCase, { mock })
-    const statusPromise = liveFitMode
-      ? fetchLiveFitStatus({ mock }).catch(() => null)
-      : Promise.resolve(null)
 
-    Promise.all([
-      cardPromise,
-      fetchIdentityEgress({ mock }).catch(() => []),
-      statusPromise,
-    ])
-      .then(([card, destinations, status]) => {
+    Promise.all([cardPromise, fetchIdentityEgress({ mock }).catch(() => [])])
+      .then(([card, destinations]) => {
         if (cancelled) return
         setPayload(card ?? null)
         setEgressEmpty(destinations.length === 0)
         setError(null)
-        if (status?.round != null) {
-          setLiveFit((prev) => {
-            if (prev?.round != null) return prev
-            return {
-              done: prev?.done ?? false,
-              ...prev,
-              round: status.round,
-              total: prev?.total ?? status.total,
-              count: prev?.count ?? status.count,
-            }
-          })
-        }
       })
       .catch((err: Error) => {
         if (!cancelled) setError(err.message || 'load failed')
@@ -107,6 +102,7 @@ export function IdentityApp() {
     }
     if (next.card && next.card !== payload) {
       setPayload(next.card)
+      setCardEpoch((n) => n + 1)
     }
   }
 
@@ -158,7 +154,7 @@ export function IdentityApp() {
       ) : null}
       {payload ? (
         <IdentityCard
-          key={`${caseId}:${payload.id}`}
+          key={`${caseId}:${payload.id}:${cardEpoch}`}
           payload={payload}
           egressEmpty={egressEmpty}
           progress={progress}
