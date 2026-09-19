@@ -62,7 +62,7 @@ npm install
 npm run dev
 ```
 
-Then open **http://127.0.0.1:5173/identity**. Default case is `pass-like-me`.
+Then open **http://127.0.0.1:5173/identity** with identity-loop on `:8788` — Live Fit session is the default (`POST /local/identity/live-fit/start`).
 
 | What | Where |
 | --- | --- |
@@ -70,6 +70,8 @@ Then open **http://127.0.0.1:5173/identity**. Default case is `pass-like-me`.
 | identity-loop | `http://127.0.0.1:8788` |
 | Vite proxy (default) | `/id-api` → `:8788` (so identity `/local/egress-destinations` does not hit mail-loop) |
 | Direct API | `VITE_IDENTITY_LOOP_BASE=http://127.0.0.1:8788` |
+| Live Fit (default `/identity`) | `POST` (or `GET`) `/local/identity/live-fit/start`, then verdict `next_card` until `live_fit.done` |
+| Single card | `/identity?case=pass-like-me` or `?case=live-fit-N` → `GET /local/identity/card` |
 | UI-only smoke | `http://127.0.0.1:5173/identity?mock=1` or `VITE_IDENTITY_MOCK=1` |
 
 Copy `apps/approve-ui/.env.example` if you need to override the base URL. Mock mode does not add egress, send, calendar, or LoRA — it only fixtures the card so the UI can be exercised without identity-loop.
@@ -78,8 +80,11 @@ Identity contract:
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/local/identity/card?case=pass-like-me` | `prompt`, `draft`, `critic_score`, `reject_reason`, `fit_tags`, `risk`, `status` |
-| POST | `/local/identity/verdict` | כמוני: `{ case, risk, status: "approved", verdict: "like_me" }` |
+| GET\|POST | `/local/identity/live-fit/start` | Session + first card (default `/identity`) |
+| GET | `/local/identity/live-fit/card` | Current session card |
+| GET | `/local/identity/live-fit/status` | Includes `ready_for_demo` |
+| GET | `/local/identity/card?case=pass-like-me` | Single card (`prompt`, `draft`, `critic_score`, `reject_reason`, `fit_tags`, `risk`, `status`). `?case=live-fit-N` still works |
+| POST | `/local/identity/verdict` | כמוני: `{ case, risk, status: "approved", verdict: "like_me" }`. Live Fit response may include `next_card` + `live_fit` |
 | POST | `/local/identity/verdict` | לא כמוני: `{ case, risk, status: "rejected", verdict: "not_like_me", reject_reason }` (empty reason → 400) |
 | GET | `/local/egress-destinations` | Identity expects `[]` (UI shows אין יעד יוצא) |
 

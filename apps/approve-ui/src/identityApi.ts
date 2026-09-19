@@ -1,17 +1,36 @@
-import type { IdentityCard, IdentityVerdict } from './identity'
+import type {
+  IdentityCard,
+  IdentityVerdict,
+  IdentityVerdictResult,
+  LiveFitStartResult,
+  LiveFitInfo,
+} from './identity'
 import {
   IDENTITY_DEFAULT_CASE,
   identityPath,
   mockIdentityCard,
+  mockLiveFitStart,
+  mockLiveFitVerdict,
   normalizeIdentityCard,
+  parseIdentityVerdictResponse,
+  parseLiveFit,
+  parseLiveFitStart,
   resolveIdentityBase,
 } from './identity'
 
 /** Same-origin Vite proxy → 127.0.0.1:8788. Override with VITE_IDENTITY_LOOP_BASE. */
-const BASE = resolveIdentityBase(import.meta.env.VITE_IDENTITY_LOOP_BASE)
+const BASE = resolveIdentityBase(import.meta.env?.VITE_IDENTITY_LOOP_BASE)
 
-const ENV_MOCK = import.meta.env.VITE_IDENTITY_MOCK === '1'
+const ENV_MOCK = import.meta.env?.VITE_IDENTITY_MOCK === '1'
 const DOWN = 'אין חיבור ל־identity-loop על :8788'
+
+let mockLiveFitIndex = 0
+let mockLiveFitActive = false
+
+export function resetIdentityMockSession(): void {
+  mockLiveFitIndex = 0
+  mockLiveFitActive = false
+}
 
 export function identityMockEnabled(queryMock: boolean): boolean {
   return ENV_MOCK || queryMock
@@ -54,12 +73,60 @@ export async function fetchIdentityCard(
   return normalizeIdentityCard(await res.json())
 }
 
+/** Backend accepts GET or POST; POST starts a fresh session. */
+export async function startLiveFit(
+  opts: { mock?: boolean } = {},
+): Promise<LiveFitStartResult> {
+  if (identityMockEnabled(opts.mock === true)) {
+    mockLiveFitActive = true
+    mockLiveFitIndex = 0
+    return mockLiveFitStart()
+  }
+  let res = await identityFetch('/local/identity/live-fit/start', {
+    method: 'POST',
+  })
+  if (res.status === 404 || res.status === 405) {
+    res = await identityFetch('/local/identity/live-fit/start')
+  }
+  assertOk(res, 'identity/live-fit/start')
+  return parseLiveFitStart(await res.json())
+}
+
+export async function fetchLiveFitStatus(
+  opts: { mock?: boolean } = {},
+): Promise<LiveFitInfo & { ready_for_demo?: boolean }> {
+  if (identityMockEnabled(opts.mock === true)) {
+    return { ready_for_demo: true, done: false }
+  }
+  const res = await identityFetch('/local/identity/live-fit/status')
+  assertOk(res, 'identity/live-fit/status')
+  const raw: unknown = await res.json()
+  const record =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {}
+  const liveFit = parseLiveFit(raw)
+  return {
+    ready_for_demo: record.ready_for_demo === true,
+    done: liveFit?.done ?? false,
+    round: liveFit?.round,
+    total: liveFit?.total,
+    count: liveFit?.count,
+  }
+}
+
 export async function postIdentityVerdict(
   body: IdentityVerdict,
   opts: { mock?: boolean } = {},
-): Promise<unknown> {
+): Promise<IdentityVerdictResult> {
   if (identityMockEnabled(opts.mock === true)) {
-    return { ok: true, mock: true, ...body }
+    if (mockLiveFitActive) {
+      mockLiveFitIndex += 1
+      const result = mockLiveFitVerdict(mockLiveFitIndex)
+      if (result.liveFit?.done) mockLiveFitActive = false
+      return result
+    }
+    return { nextCard: null }
   }
   const res = await identityFetch('/local/identity/verdict', {
     method: 'POST',
@@ -74,7 +141,7 @@ export async function postIdentityVerdict(
     const detail = payload.error ? ` ${payload.error}` : ''
     throw new Error(`identity/verdict ${res.status}${detail}`)
   }
-  return readJson(res)
+  return parseIdentityVerdictResponse(await readJson(res))
 }
 
 export async function fetchIdentityEgress(
